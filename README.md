@@ -5,7 +5,7 @@ Do you like Sphinx Chat? Do you think Impervious is pretty cool? Ever wondered h
 
 ## Step 1: Setup a couple of Simnet nodes
 
-We don't want to use actual sats right now since this is just a proof-of-concept. You can either follow the tutorial [here](https://dev.lightning.community/tutorial/01-lncli/index.html) or spin up a simnet with [Polar](https://lightningpolar.com). I haven't had the chance to fully dive into Polar, so I will just follow the tutorial. If someone wants to do this in Polar, feel free to make a merge request and I'll gladly add a section describing how to do it with Polar. 
+We don't want to use actual sats right now since this is just a proof-of-concept. We can either follow the tutorial [here](https://dev.lightning.community/tutorial/01-lncli/index.html) or spin up a simnet with [Polar](https://lightningpolar.com). I haven't had the chance to fully dive into Polar, so I will just follow the tutorial. If someone wants to do this in Polar, feel free to make a merge request and I'll gladly add a section describing how to do it with Polar. 
 
 I recommend compiling LND from source instead of downloading binaries because we are going to run some custom install flags to make certain RPC endpoints available.
 ```
@@ -14,19 +14,19 @@ $ cd lnd
 $ git checkout v0.14.2-beta                                             #Use latest release
 $ make && make install tags="signrpc walletrpc chainrpc invoicesrpc"
 ```
-Don't forget to either modify `lnd.conf` and uncomment `accept-amp=true` or set the flag when running the `lnd` command: `$ lnd --accept-amp`. Once your Alice, Bob and Charlie are connected and have a couple of channels with simnet sats between them, it's time to write some code.
+We can't forget to either modify `lnd.conf` and uncomment `accept-amp=true` or set the flag when running the `lnd` command: `$ lnd --accept-amp`. Once Alice, Bob and Charlie are connected and have a couple of channels with simnet sats between them, it's time to write some code.
 
 ## Step 2: Making a virtual-environemnt and installing necessary dependencies
 
-I am copying from the `python.md` file from the `docs/grpc` directory in LND. Make yourself a virtual-environemnt `$ python3 -m venv venv`, activate it `$ source venv/bin/activate` and make a directory called `protos`: `(venv) $ mkdir protos && cd protos`.
-Install the following:
+I am copying from the `python.md` file from the `docs/grpc` directory in LND. We start by making ourselves a virtual-environemnt `$ python3 -m venv venv`, activating it `$ source venv/bin/activate` and making a directory called `protos`: `(venv) $ mkdir protos && cd protos`.
+Then, we install the following:
 ```
 (venv) $ pip install grpcio grpcio-tools googleapis-common-protos
 (venv) $ git clone https://github.com/googleapis/googleapis.git
 (venv) $ curl -o lightning.proto -s https://raw.githubusercontent.com/lightningnetwork/lnd/master/lnrpc/lightning.proto
 (venv) $ curl -o router.proto -s https://raw.githubusercontent.com/lightningnetwork/lnd/master/lnrpc/routerrpc/router.proto
 ```
-Then we will generate the python stubs.
+Followed by generating the python stubs.
 ```
 (venv) $ python -m grpc_tools.protoc --proto_path=googleapis:. --python_out=. --grpc_python_out=. lightning.proto
 (venv) $ python -m grpc_tools.protoc --proto_path=googleapis:. --python_out=. --grpc_python_out=. router.proto
@@ -82,13 +82,13 @@ for resp in stub.SendPaymentV2(router.SendPaymentRequest(
  ), metadata=[('macaroon', macaroon)]):
      print(resp)
 ```
-There are a couple of key things to mention. One, we are using the `routerrpc` rpc method `SendPaymentV2` as opposed to the deprecated `SendPayment`. I'm fairly certain it would work with `SendPayment` after examining the code as `SendPaymentV2` just seems to be optimized for concurrency. We also must specify `amp=true` otherwise, it will fail. Now the really important thing to notice is all we have to do to set a custom record is define the `dest_custom_records` attribute. That's it. The available literature around this topic makes it seem like you have to build your own HTLCs and then attach the custom data in the `lnwire` message in TLV format, but thankfully `lnd` has built a simple API that takes care of all of this for us. 
+There are a couple of key things to mention. One, we are using the `routerrpc` rpc method `SendPaymentV2` as opposed to the deprecated `SendPayment`. I'm fairly certain it would work with `SendPayment` after examining the code for both methods. `SendPaymentV2` just seems to be optimized for concurrency. We also must specify `amp=true` otherwise, it will fail. Now the really important thing to notice is all we have to do to set a custom record is define the `dest_custom_records` attribute. That's it. The available literature around this topic makes it seem like you have to build your own HTLCs and then attach the custom data in the `lnwire` message in TLV format, but thankfully `lnd` has built a simple API that takes care of all of this for us. 
 
-It's important that any custom record have a key value greater than `65536` as any key value below this has been reserved. A fee limit must higher than 0 must also be set to pay for the routing fee otherwise, the payment can't be sent.
+It's important that any custom record have a key value greater than `65536` as any key value below this have been reserved. A fee limit higher than 0 must also be set to pay for the routing fees otherwise, the payment can't be sent.
 
 ## Step 4: SubscribeInvoices
 
-Whenever we attach a custom record to a payment, the receiver will not reject it thankfully. No kind of base code modifications need be done nor special configuration parameters need be set. All we need to do is to use the `SubscribeInvoices()` rpc method which is just a server->client uni-directional stream.
+Whenever we attach a custom record to a payment, the receiver will thankfully, not reject it. No kind of base code modifications need be done nor special configuration parameters need be set. All we need to do is to use the `SubscribeInvoices()` rpc method which is just a server->client uni-directional stream.
 `recv_msg.py`
 ```
 import protos.lightning_pb2 as ln
@@ -114,7 +114,7 @@ for resp in stub.SubscribeInvoices(ln.InvoiceSubscription(), metadata=[('macaroo
     for htlc in resp.htlcs:
         print(htlc.custom_records[400000].decode('utf-8'))
 ```
-We listen for any new payments the node encounters and will print the `400000` custom record value in the htlcs array. Pretty simple stuff. Now Let's test it.
+We listen for any new payments the node encounters and we print the `400000` custom record value in the htlcs array. Pretty simple stuff. Now Let's test it.
 
 ## Step 5: Testing It
 
@@ -244,7 +244,7 @@ payment_index: 9
 
 (venv) $
 ```
-That's pretty much it! The key is making sure your channels have enough inboud and outbound liquidity to start. You can easily modify both scripts so the sender is Charlie and the receiver Alice. You can also extend them to take text input from the command prompt and send that instead of a fixed string like `"test"`. You can go even further and create a script to break up a file into chunks and use lightning as the transport layer. The possibilities are endless.
+That's pretty much it! The key is making sure our channels have enough inboud and outbound liquidity to start. We can easily modify both scripts so the sender is Charlie and the receiver Alice. We can also extend them to take text input from the command prompt and send that instead of a fixed string like `"test"`. We could go even further and create a script to break up a file into chunks and use lightning as the transport layer. The possibilities are endless.
 
 # Bonus Section - Sending a Custom Message Without a Payment
 
