@@ -5,9 +5,9 @@ Do you like Sphinx Chat? Do you think Impervious is pretty cool? Ever wondered h
 
 ## Step 1: Setup a couple of Simnet nodes
 
-We want don't want to use actual sats right now since this is just a proof-of-concept. You can either follow the tutorial [here](https://dev.lightning.community/tutorial/01-lncli/index.html) or spin up a simnet with [Polar](https://lightningpolar.com). I haven't had the chance to fully dive into Polar, so I will just follow the tutorial. If someone wants to do this in Polar, feel free to make a merge request and I'll gladly add a section describing how to do it with Polar. 
+We don't want to use actual sats right now since this is just a proof-of-concept. You can either follow the tutorial [here](https://dev.lightning.community/tutorial/01-lncli/index.html) or spin up a simnet with [Polar](https://lightningpolar.com). I haven't had the chance to fully dive into Polar, so I will just follow the tutorial. If someone wants to do this in Polar, feel free to make a merge request and I'll gladly add a section describing how to do it with Polar. 
 
-I recommend compiling LND from source instead of downloading binaries because we are gonna run some custom install flags to make certain RPC endpoints available.
+I recommend compiling LND from source instead of downloading binaries because we are going to run some custom install flags to make certain RPC endpoints available.
 ```
 $ git clone git@github.com:lightningnetwork/lnd.git
 $ cd lnd
@@ -18,7 +18,7 @@ Don't forget to either modify `lnd.conf` and uncomment `accept-amp=true` or set 
 
 ## Step 2: Making a virtual-environemnt and installing necessary dependencies
 
-I am copying the `python.md` file from the `docs/grpc` directory in LND. Make yourself a virtual-environemnt `$ python3 -m venv venv`, activate it `$ source venv/bin/activate` and make a directory called `protos`: `(venv) $ mkdir protos && cd protos`.
+I am copying from the `python.md` file from the `docs/grpc` directory in LND. Make yourself a virtual-environemnt `$ python3 -m venv venv`, activate it `$ source venv/bin/activate` and make a directory called `protos`: `(venv) $ mkdir protos && cd protos`.
 Install the following:
 ```
 (venv) $ pip install grpcio grpcio-tools googleapis-common-protos
@@ -82,9 +82,9 @@ for resp in stub.SendPaymentV2(router.SendPaymentRequest(
  ), metadata=[('macaroon', macaroon)]):
      print(resp)
 ```
-There are a couple of key things to mention. One, we are using the `routerrpc` rpc method `SendPaymentV2` as opposed to the deprecated `SendPayment`. I'm fairly certain it would work with `SendPayment` after examining the code as `SendPaymentV2` just seems to be optimized for concurrency. We also must specify `amp=true` otherwise, it will fail. Now the really important thing to notice is all we have to do to set a custom record is set `dest_custom_records`. That's it. The available literature around this topic makes it seem like you have to build your own HTLCs and then attach the custom data in the `lnwire` message in TLV format, but thankfully `lnd` has built a simple API that takes care of all of this for us. 
+There are a couple of key things to mention. One, we are using the `routerrpc` rpc method `SendPaymentV2` as opposed to the deprecated `SendPayment`. I'm fairly certain it would work with `SendPayment` after examining the code as `SendPaymentV2` just seems to be optimized for concurrency. We also must specify `amp=true` otherwise, it will fail. Now the really important thing to notice is all we have to do to set a custom record is define the `dest_custom_records` attribute. That's it. The available literature around this topic makes it seem like you have to build your own HTLCs and then attach the custom data in the `lnwire` message in TLV format, but thankfully `lnd` has built a simple API that takes care of all of this for us. 
 
-It's important that any custom record have a key value greater than `65536` as any key value below this has been reserved. A reasonably high fee limit must also be set to pay for the routing fee otherwise, the payment can't be sent.
+It's important that any custom record have a key value greater than `65536` as any key value below this has been reserved. A fee limit must higher than 0 must also be set to pay for the routing fee otherwise, the payment can't be sent.
 
 ## Step 4: SubscribeInvoices
 
@@ -114,7 +114,7 @@ for resp in stub.SubscribeInvoices(ln.InvoiceSubscription(), metadata=[('macaroo
     for htlc in resp.htlcs:
         print(htlc.custom_records[400000].decode('utf-8'))
 ```
-So here we listen for any new payments that node encounters and will print the `400000` custom record value in the htlcs array. Pretty simple stuff. Now Let's test it.
+We listen for any new payments the node encounters and will print the `400000` custom record value in the htlcs array. Pretty simple stuff. Now Let's test it.
 
 ## Step 5: Testing It
 
@@ -244,11 +244,11 @@ payment_index: 9
 
 (venv) $
 ```
-That's pretty much it! The key is making sure your channels have enough inboud and outbound liquidity to start. You can easily modify both scripts so the sender is Charlie and the receiver Alice, it works. You can also extend them to take text input from the command prompt and send that instead of a fixed string like `"test"`. You can create a script to break up a file into chunks and use lightning as the transport layer. The possibilities are endless.
+That's pretty much it! The key is making sure your channels have enough inboud and outbound liquidity to start. You can easily modify both scripts so the sender is Charlie and the receiver Alice. You can also extend them to take text input from the command prompt and send that instead of a fixed string like `"test"`. You can go even further and create a script to break up a file into chunks and use lightning as the transport layer. The possibilities are endless.
 
 # Bonus Section - Sending a Custom Message Without a Payment
 
-If for whatever reason you want to use the encrypted communication layer between two LN nodes but don't want your custom records to be attached to a payment, LND has an easy solution for that as well. For the sender, we use the `lnrpc` method `SendCustomMessage` and the receiver must listen for custom messages with `SubscribeCustomMessages`. The issue with using this as opposed to attaching a custom record to a payment is that you can only send messages to peers you are directly connected to. A channel between you is not necessary but other nodes will not route your messages for you, you must be directly connected. Also, because here the `type` field in the `SendCustomMessageRequest` is a `uint32` instead of `utin64`, the range of acceptable values is `32768 <=> 65535`.
+If for whatever reason you wanted to use the encrypted communication layer between two LN nodes but didn't want your custom records to be attached to a payment, LND has an easy solution for that as well. For the sender, we use the `lnrpc` method `SendCustomMessage` and the receiver must listen for custom messages with `SubscribeCustomMessages`. The issue with using this as opposed to attaching a custom record to a payment is that you can only send messages to peers you are directly connected to. A channel between you is not necessary but other nodes will not route your messages for you, you must be directly connected. Also, because here the `type` field in the `SendCustomMessageRequest` is a `uint32` instead of `uint64`, the range of acceptable values is `32768 <=> 65535`.
 `send_msg.py`
 ```
 import protos.lightning_pb2 as ln
